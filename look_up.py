@@ -18,10 +18,16 @@ def request(item_id: str, auth: str, url_prefix: str) -> Tuple[str, requests.Res
 	return:
 	item_id, response of the request
 	"""
+	return item_id, requests.get(
+		url= url_prefix + item_id,
+		headers = {
+			"Authorization" : auth
+		}
+	)
 
 
 
-def look_up(ids: Iterable, auth: str, max_workers: int = 5) -> dict:
+def look_up(ids: Iterable, auth: str, max_workers: int = 5, url_prefix='https://eluv.io/items/') -> dict:
 	"""
 	args:
 	ids: an iterable containing Base64 strings referring to item ids
@@ -38,3 +44,15 @@ def look_up(ids: Iterable, auth: str, max_workers: int = 5) -> dict:
 	return:
 	resulting dictionary of id->response pairs.
 	"""
+	executor = ProcessPoolExecutor(max_workers=max_workers)
+	results = {}
+	futures = []
+	authenticated_req = lambda id: request(id, auth=auth, url_prefix=url_prefix)
+	for id in ids:
+		if id not in results.keys():
+			results[id] = None
+			futures.append(executor.submit(authenticated_req, id))
+	for future in as_completed(futures):
+		id, response = future.result()
+		results[id] = response
+	return results
